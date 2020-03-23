@@ -177,3 +177,54 @@ private struct AnyCodingKey: CodingKey {
         self.stringValue = String(intValue)
     }
 }
+
+// MARK: - Property wrappers for providing default-value if key not present
+
+/// Decodes values with a default value if decoding fails
+@propertyWrapper
+public struct DefaultNilCodable<Default: Codable>: Codable {
+	public var wrappedValue: Optional<Default>
+	
+	public init(wrappedValue: Optional<Default>) {
+		self.wrappedValue = wrappedValue
+	}
+	
+	public init(from decoder: Decoder) throws {
+		wrappedValue = try decoder.singleValueContainer().decode(Default.self)
+	}
+	
+	public func encode(to encoder: Encoder) throws {
+		guard wrappedValue != nil else { return }
+		try wrappedValue.encode(to: encoder)
+	}
+}
+
+@propertyWrapper
+public struct DefaultEmptyArrayCodable<Default: Codable>: Codable {
+	public var wrappedValue: Array<Default>
+	
+	public init(wrappedValue: Array<Default>) {
+		self.wrappedValue = wrappedValue
+	}
+	
+	public init(from decoder: Decoder) throws {
+		wrappedValue = try decoder.singleValueContainer().decode(Array<Default>.self)
+	}
+	
+	public func encode(to encoder: Encoder) throws {
+		guard !wrappedValue.isEmpty else { return }
+		try wrappedValue.encode(to: encoder)
+	}
+}
+
+// MARK: - KeyedDecodingContainer
+
+public extension KeyedDecodingContainer {
+	func decode<P>(_ type: DefaultNilCodable<P>.Type, forKey key: Key) throws -> DefaultNilCodable<P> {
+		try decodeIfPresent(type, forKey: key) ?? DefaultNilCodable(wrappedValue: nil)
+	}
+	
+	func decode<P>(_ type: DefaultEmptyArrayCodable<P>.Type, forKey key: Key) throws -> DefaultEmptyArrayCodable<P> {
+		try decodeIfPresent(type, forKey: key) ?? DefaultEmptyArrayCodable(wrappedValue: [])
+	}
+}
